@@ -1,4 +1,4 @@
-accelerate==0.20.3
+accelerate
 colorama
 datasets
 sentencepiece
