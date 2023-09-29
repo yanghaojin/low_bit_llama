@@ -104,6 +104,11 @@ def model_to_half(model):
             m.bias = m.bias.half()
     print(Style.BRIGHT + Fore.YELLOW + 'Converted as Half.')
 
+def prepare_mpq_linear_params(model):
+    for n, m in model.named_modules():
+        if isinstance(m, MPQLinearCuda):
+            m.prepare_scales_zeros()
+    print(Style.BRIGHT + Fore.YELLOW + 'mpq_linear layer param-preparation finished.')
 
 def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
     if type(module) in layers:
