@@ -22,7 +22,7 @@ args.model_size = args.model_size.upper()
 if args.llama_version == 1: 
     model_uri = f'GreenBitAI/LLaMA-{args.model_size}-4bit' 
      
-    if args.model_size in ["7b", "7B", "30b", "30B"]:
+    if args.model_size in ["3b", "3B", "30b", "30B"]:
         model_uri = model_uri + f'-groupsize{args.groupsize}' 
      
 else: 
