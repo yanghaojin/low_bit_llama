@@ -116,7 +116,7 @@ def make_quant(module, names, name='', groupsize=-1, double_groupsize=-1, bits=4
                 setattr(
                     module, attr, MPQLinearCuda(in_channels=tmp.in_features, out_channels=tmp.out_features,
                                 w_bit=bits, dtype=torch.half, group_size=groupsize, dq_group_size=double_groupsize,
-                                          llama_version=1 if v1 else 2)
+                                          dq_mode=1 if v1 else 2)
                 )
     for name1, child in module.named_children():
         make_quant(child, names, name + '.' + name1 if name != '' else name1, groupsize=groupsize,
