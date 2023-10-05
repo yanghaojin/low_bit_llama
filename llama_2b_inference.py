@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser("Run inference with low-bit LLaMA models.")
 parser.add_argument("-s", "--model-size", choices=["1.1b", "1.1B", "3b", "3B", "7b", "7B", "13b", "13B"], required=False, default="7B", type=str, help="Which model size to use.")
 parser.add_argument("-v", "--llama-version", choices=[1, 2], required=False, default=1, type=int, help="which version to evaluate")
 parser.add_argument("-g", "--groupsize", choices=[8, 16, 32], required=False, default=32, type=int, help="Specify quantization groups")
-parser.add_argument("-e", "--use-gbe", required=False, default=False, type=bool, help="Specify whether to use GreenBitEngine layers")
+parser.add_argument("-e", "--use-gbe", required=False, default=False, type=bool, action='store_true', help="Specify whether to use GreenBitEngine layers")
 
 args = parser.parse_args()
 args.model_size = args.model_size.upper()
