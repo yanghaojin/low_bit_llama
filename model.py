@@ -97,17 +97,17 @@ class QuantLinear(nn.Module):
         return out
 
 
-def make_quant(module, names, name='', groupsize=-1, double_groupsize=-1, bits=4, v1=True, asym=True, use_bte=False):
+def make_quant(module, names, name='', groupsize=-1, double_groupsize=-1, bits=4, v1=True, asym=True, use_gbe=False):
     if isinstance(module, QuantLinear):
         return
-    if use_bte and isinstance(module, MPQLinearCuda):
+    if use_gbe and isinstance(module, MPQLinearCuda):
         return
 
     for attr in dir(module):
         tmp = getattr(module, attr)
         name1 = name + '.' + attr if name != '' else attr
         if name1 in names:
-            if not use_bte:
+            if not use_gbe:
                 setattr(
                     module, attr, QuantLinear(tmp.in_features, tmp.out_features, groupsize=groupsize,
                                               double_groupsize=double_groupsize, bits=bits, v1=v1, asym=asym)
@@ -120,7 +120,7 @@ def make_quant(module, names, name='', groupsize=-1, double_groupsize=-1, bits=4
                 )
     for name1, child in module.named_children():
         make_quant(child, names, name + '.' + name1 if name != '' else name1, groupsize=groupsize,
-                   double_groupsize=double_groupsize, bits=bits, v1=v1, asym=asym, use_bte=use_bte)
+                   double_groupsize=double_groupsize, bits=bits, v1=v1, asym=asym, use_gbe=use_gbe)
 
 def model_to_half(model):
     model.half()
@@ -149,15 +149,15 @@ def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
 
 
 def load_llama_model(model_uri, cache_dir, groupsize=-1, double_groupsize=-1, bits=4, half=False, v1=True,
-                     asym=False, device_map="auto", seqlen=2048, use_bte=False):
+                     asym=False, device_map="auto", seqlen=2048, use_gbe=False):
     import accelerate
     from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
-    if use_bte:
+    if use_gbe:
         try:
             from bitorch_engine.layers.qlinear.nbit.cuda import MPQLinearCuda
         except ModuleNotFoundError as e:
-            use_bte = False
-            print(f"Module not found: {e}. Set use_bte to False")
+            use_gbe = False
+            print(f"Module not found: {e}. Set use_gbe to False")
 
     print(Style.BRIGHT + Fore.CYAN + "Loading Model ...")
     t0 = time.time()
@@ -171,7 +171,7 @@ def load_llama_model(model_uri, cache_dir, groupsize=-1, double_groupsize=-1, bi
             if name in layers:
                 del layers[name]
         make_quant(model, layers, groupsize=groupsize, double_groupsize=double_groupsize, bits=bits,
-                   v1=v1, asym=asym, use_bte=use_bte)
+                   v1=v1, asym=asym, use_gbe=use_gbe)
 
     model = accelerate.load_checkpoint_and_dispatch(
         model=model,
@@ -182,7 +182,7 @@ def load_llama_model(model_uri, cache_dir, groupsize=-1, double_groupsize=-1, bi
 
     model.seqlen = seqlen
 
-    if use_bte:
+    if use_gbe:
         prepare_mpq_linear_params(model)
     if half:
         model_to_half(model)
@@ -195,9 +195,16 @@ def load_llama_model(model_uri, cache_dir, groupsize=-1, double_groupsize=-1, bi
     return model, tokenizer
 
 
-def load_llama_model_lora(model_uri, lora_uri, cache_dir, bits = 32, groupsize=-1, device_map="auto", seqlen=2048, max_memory=None):
+def load_llama_model_lora(model_uri, lora_uri, cache_dir, bits = 32, groupsize=-1, device_map="auto", seqlen=2048,
+                          max_memory=None, use_gbe=False):
     import accelerate
     from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
+    if use_gbe:
+        try:
+            from bitorch_engine.layers.qlinear.nbit.cuda import MPQLinearCuda
+        except ModuleNotFoundError as e:
+            use_gbe = False
+            print(f"Module not found: {e}. Set use_gbe to False")
     
     if max_memory is None:
         max_memory = {0: '24Gib', 'cpu': '48Gib'}
@@ -213,7 +220,7 @@ def load_llama_model_lora(model_uri, lora_uri, cache_dir, bits = 32, groupsize=-
         for name in ['lm_head']:
             if name in layers:
                 del layers[name]
-        make_quant(model, layers, groupsize=groupsize, bits = bits)
+        make_quant(model, layers, groupsize=groupsize, bits = bits, use_gbe=use_gbe)
 
     accelerate.load_checkpoint_in_model(
         model,
@@ -222,6 +229,8 @@ def load_llama_model_lora(model_uri, lora_uri, cache_dir, bits = 32, groupsize=-
     )
 
     model.seqlen = seqlen
+    if use_gbe:
+        prepare_mpq_linear_params(model)
     # rotary_emb fix
     for n, m in model.named_modules():
         if 'rotary_emb' in n:
